@@ -337,24 +337,20 @@ function add_geo_div() {
 function add_geo_support() {
 	global $geolocation_options, $posts;
 	
-	// Do a check to see if geolocation has been enabled in the admin, i.e On / Off. If on include javascript etc in the header
-	if(get_post_meta($posts[0]->ID, 'geo_enabled', true)) {
-	
-		// To do: add support for multiple Map API providers
-		switch(PROVIDER) {
-			case 'google':
-				echo add_google_maps($posts);
-				break;
-			case 'yahoo':
-				echo add_yahoo_maps($posts);
-				break;
-			case 'bing':
-				echo add_bing_maps($posts);
-				break;
-		}
-		echo '<link type="text/css" rel="stylesheet" href="'.esc_url(plugins_url('style.css', __FILE__)).'" />';
-	
+	// To do: add support for multiple Map API providers
+	switch(PROVIDER) {
+		case 'google':
+			echo add_google_maps($posts);
+			break;
+		case 'yahoo':
+			echo add_yahoo_maps($posts);
+			break;
+		case 'bing':
+			echo add_bing_maps($posts);
+			break;
 	}
+	echo '<link type="text/css" rel="stylesheet" href="'.esc_url(plugins_url('style.css', __FILE__)).'" />';
+	
 }
 
 function add_google_maps($posts) {
@@ -368,6 +364,46 @@ function add_google_maps($posts) {
 		var $j = jQuery.noConflict();
 		$j(function(){
 			
+			if($j(".map-container-all").length != 0) {
+								
+				var center = new google.maps.LatLng(0.0, 0.0);
+				var myOptions = {
+				  zoom: '.$zoom.',
+				  center: center,
+				  mapTypeId: google.maps.MapTypeId.ROADMAP
+				};
+											
+				var map = new google.maps.Map(document.getElementById("geolocation-map"), myOptions);
+				var infowindow = new google.maps.InfoWindow();
+				var bounds = new google.maps.LatLngBounds();
+				var image = "'.esc_js(esc_url(plugins_url('img/wp_pin.png', __FILE__ ))).'";
+				var shadow = new google.maps.MarkerImage("'.plugins_url('img/wp_pin_shadow.png', __FILE__ ).'",
+					new google.maps.Size(39, 23),
+					new google.maps.Point(0, 0),
+					new google.maps.Point(12, 25));
+			
+				$j(".map-container-all .geolocation-link-all").each(function(index) {
+					var post_title = $j(this).attr("data-post-title");
+					var myLatLng = new google.maps.LatLng($j(this).attr("name").split(",")[0], $j(this).attr("name").split(",")[1]);
+					var marker = new google.maps.Marker({
+						position: myLatLng,
+						map: map, 
+						title: $j(this).attr("data-post-title")';
+					if(get_option('geolocation_wp_pin')) {
+						echo ',
+						icon: image,
+						shadow: shadow';
+					}
+					echo '});			
+					bounds.extend(myLatLng);
+    				map.fitBounds(bounds);
+					google.maps.event.addListener(marker, \'click\', function() {
+						infowindow.setContent(post_title);
+						infowindow.open(map,marker);
+					});
+				});
+			}
+			
 			var center = {};
 			var myOptions = {};
 			var map = {};
@@ -377,6 +413,8 @@ function add_google_maps($posts) {
 			
 			$j(\'.geolocation-link\').each(function(index) {
 				
+				//alert(index);
+				
 				center[index] = new google.maps.LatLng(0.0, 0.0);
 				myOptions[index] = {
 				  zoom: '.$zoom.',
@@ -384,7 +422,7 @@ function add_google_maps($posts) {
 				  mapTypeId: google.maps.MapTypeId.ROADMAP
 				};
 											
-				map[index] = new google.maps.Map($j(this).prev().get(0), myOptions[index]);
+				map[index] = new google.maps.Map($j(this).siblings(".geolocation-map").get(0), myOptions[index]);
 								
 				image[index] = "'.esc_js(esc_url(plugins_url('img/wp_pin.png', __FILE__ ))).'";
 				shadow[index] = new google.maps.MarkerImage("'.plugins_url('img/wp_pin_shadow.png', __FILE__ ).'",
@@ -476,6 +514,9 @@ function add_google_maps($posts) {
 				google.maps.event.addListener(map[index], "click", function() {
 					window.location = "http://maps.google.com/maps?q=" + map.center.lat() + ",+" + map.center.lng();
 				});
+				
+				
+			
 			});
 		});
 	</script>';
@@ -727,61 +768,22 @@ function geolocation_settings_page() {
 }
 
 function geolocation_map_all_func() {
-	default_settings();
-	$zoom = (int) get_option('geolocation_default_zoom');
+			
+	$myposts = get_posts();
 	
-	$header = '
-	<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
-	<script type="text/javascript">
-		var $j = jQuery.noConflict();
-		$j(function(){
-			var center = new google.maps.LatLng(0.0, 0.0);
-			var myOptions = {
-		      zoom: '.$zoom.',
-		      center: center,
-		      mapTypeId: google.maps.MapTypeId.ROADMAP
-		    };
-		    var map = new google.maps.Map(document.getElementById("map"), myOptions);
-		    var image = "'.esc_js(esc_url(plugins_url('img/wp_pin.png', __FILE__ ))).'";
-		    var shadow = new google.maps.MarkerImage("'.plugins_url('img/wp_pin_shadow.png', __FILE__ ).'",
-		    	new google.maps.Size(39, 23),
-				new google.maps.Point(0, 0),
-				new google.maps.Point(12, 25));
-		    var marker = new google.maps.Marker({
-					position: center, 
-					map: map, 
-					title:"Post Location"';
-				if(get_option('geolocation_wp_pin')) {
-					$header .= ',
-					icon: image,
-					shadow: shadow';
-				}
-				$header .= '});
-			
-			var allowDisappear = true;
-			var cancelDisappear = false;
-			
-			$j("#map").css("visibility", "visible"); 
-			$j("#map").css("position", "static");
-			var lat = $j(".geolocation-link").attr("name").split(",")[0];
-			var lng = $j(".geolocation-link").attr("name").split(",")[1];
-			var latlng = new google.maps.LatLng(lat, lng);
-			placeMarker(latlng);			
+	echo '<div class="map-container-all"><div class="geolocation-map-all" id="geolocation-map" style="width:100%;height:300px;"></div>';
+	foreach( $myposts as $post ) {
+		setup_postdata($post);
+		$latitude = clean_coordinate(get_post_meta($post->ID, 'geo_latitude', true));
+		$longitude = clean_coordinate(get_post_meta($post->ID, 'geo_longitude', true));
+		$address = get_post_meta($post->ID, 'geo_address', true);
 		
-			function placeMarker(location) {
-				map.setZoom('.$zoom.');
-				marker.setPosition(location);
-				map.setCenter(location);
-			}
-			
-			google.maps.event.addListener(map, "click", function() {
-				window.location = "http://maps.google.com/maps?q=" + map.center.lat() + ",+" + map.center.lng();
-			});
-		});
-	</script>';
-	
-	add_action('wp_head', $header);
-	add_filter('the_content', 'display_location', 5);
+		// Only show those posts that have been tag'd and are set to public
+		if(get_post_meta($post->ID, 'geo_enabled', true) != '' && (bool)get_post_meta($post->ID, 'geo_public', true)) {
+			echo '<div class="geolocation-link-all" id="'.$post->ID.'" name="'.$latitude.','.$longitude.'" data-post-title="'.$post->post_title.'"></div>';
+		}
+	}
+	echo '</div>';
 }
 
 ?>
